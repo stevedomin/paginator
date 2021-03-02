@@ -7,6 +7,66 @@ on:
       - main
 
 jobs:
+  dialyzer:
+    name: Static code analysis
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        elixir:
+        - "1.11"
+        otp:
+        - "23.0"
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+
+    - name: Set up Elixir
+      uses: actions/setup-elixir@v1
+      with:
+        elixir-version: ${{ matrix.elixir }}
+        otp-version: ${{ matrix.otp }}
+
+    - name: Restore deps cache
+      uses: actions/cache@v2
+      with:
+        path: deps
+        key: ${{ runner.os }}-mix-{{ matrix.otp }}-${{ matrix.elixir }}-${{ hashFiles('**/mix.lock') }}
+
+    - name: Restore _build cache
+      uses: actions/cache@v2
+      with:
+        path: _build
+        key: ${{ runner.os }}-build-${{ matrix.otp }}-${{ matrix.elixir }}-${{ hashFiles('**/mix.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-build-${{ matrix.otp }}-${{ matrix.elixir }}-${{ hashFiles('**/mix.lock') }}
+          ${{ runner.os }}-build-${{ matrix.otp }}-${{ matrix.elixir }}
+
+    - name: Install hex
+      run: mix local.hex --force
+
+    - name: Install rebar
+      run: mix local.rebar --force
+
+    - name: Install package dependencies
+      run: mix deps.get
+
+    - name: Compile package dependencies
+      run: mix deps.compile
+
+    - name: Restore Dialyzer cache
+      uses: actions/cache@v2
+      with:
+        path: priv/plts
+        key: ${{ runner.os }}-build-${{ matrix.otp }}-${{ matrix.elixir }}-${{ hashFiles('**/mix.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-build-${{ matrix.otp }}-${{ matrix.elixir }}-${{ hashFiles('**/mix.lock') }}
+          ${{ runner.os }}-build-${{ matrix.otp }}-${{ matrix.elixir }}
+
+    - name: Run dialyzer
+      run: mix dialyzer --format dialyxir
+
   test:
     name: Elixir ${{matrix.elixir}} / OTP ${{matrix.otp}}
     runs-on: ubuntu-latest
